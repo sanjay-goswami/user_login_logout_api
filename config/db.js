@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-// uri for development stage
-const MONGO_URI =  "mongodb://localhost/session_api"
+require("dotenv").config();
+const MONGO_URI =  process.env.MONGO_URI;
 mongoose.connect(MONGO_URI,{
     useNewUrlParser:true,
     useUnifiedTopology:true,

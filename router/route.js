@@ -2,87 +2,97 @@ const express = require("express");
 const router = new express.Router();
 const bcrypt = require("bcryptjs");
 const User = require("../model/user");
-const jwt = require("jsonwebtoken");
 const verifyToken = require("../middleware/auth");
 require("../middleware/auth");
 
-// const  securepassword=async(value)=>{
-//     return await bcrypt.hash(value,10);
-// }
 
-router.post("/api/signup",async (req,res)=>{
-    // console.log(req.body);
+
+router.post("/api/register",async (req,res)=>{
     const {name,email,password} = req.body;
-    // encrypted_password = await bcrypt.hash(password,10);
-    const token = jwt.sign(email,"this is secret key");
-    new_user =new User({name:name,email:email,password:password,token:token});
+    new_user =new User({name:name,email:email,password:password});
+    const token = await new_user.generateAuthToken();
     new_user.save((err,data)=>{
         if(err)
-        res.status(400).send(err);
-        else
-        res.status(201).send({
-            "success":1,
-            "token":token
-        })
+        res.status(400).send({"success":0,"message":"Bad request"});
+        else{
+            res.status(201).send({
+                "success":1,
+                "token":token
+            })
+        }
     })
 })
+
+
 router.post("/api/login",(req,res)=>{
     const email = req.body.email;
     const password = req.body.password;
     try{
         User.findOne({email:email},async (err,data)=>{
             if(err)
-            res.status(400).send({"message":"bad request"});
+            res.status(400).send({"login":"failed","message":"bad request"});
             else if(data == null)
             res.status(400).send({
                 "login":"failed",
-                "message":"Incorrect mail"
+                "message":"Invalid email or password!"
             })
             else{
                 const is_equal = await bcrypt.compare(password,data.password);
                 if(is_equal){
 
-                    var token = data.token;
-                    console.log(data)
                     res.status(200).send({
                         "login":"Success",
-                        "token": token
+                        "token": data.token
                     })
                 }
                 else
                 res.status(400).send({
                     "login":"Failed",
-                    "message":"Incorrect Password"
+                    "message":"Invalid email or password!"
                 })
             }
         })
     }
     catch{
-        res.status(400).send({"message":"Bad Request"});
+        res.status(400).send({"login":"Failed","message":"Bad Request"});
     }
-    // res.send({"message":"authorized"});
 })
 
-router.get("/test/:hash",async (req,res)=>{
-    input_hash = req.params.hash;
-    text = "test123";
-    const is_equal = await bcrypt.compare(text,input_hash);
-    res.send({
-        "simple_text":text,
-        "is_equal":is_equal
-    })
-})
-
-router.get("/user",(req,res)=>{
-    // res.json(req);
-    res.send(req.headers.authorization)
-    console.log(req.auth);
-    // User.find((err,data)=>{
-    //     if(err)
-    //     res.status(400).send({"success":0,"message":"Bad Request"})
-    //     else
-    //     res.status(200).send(data)
-    // })
+router.post("/api/change_password",verifyToken,async(req,res)=>{
+    const  auth_token = req.headers.authorization.split(" ")[1];
+    const old_password = req.body.old_password;
+    const new_password = req.body.new_password;
+    User.findOne({_id:req.user._id},async (err,data)=>{
+       if(err)
+       {
+           res.status(400).send({
+               "login":"failed",
+               "message":"bad request"
+           });
+       }
+       const is_equal = await bcrypt.compare(old_password,data.password);
+       if((data.token == auth_token) && is_equal ){
+            data.password = new_password;
+            const token = await data.generateAuthToken();
+            data.save((err1,data1)=>{
+                if(err)
+                {
+                    res.status(400).send({
+                        "login":"failed",
+                        "message":"bad request"
+                    });
+                }
+                else
+                res.status(201).send({"login":"success","message":"password changed successfully","token":token});
+            });
+       }
+       else{
+           res.status(400).send({
+               "login":"failed",
+               "message":"incorrect old password or token expired"
+           })
+       }
+   })
 })
 
 module.exports = router;

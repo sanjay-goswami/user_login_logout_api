@@ -1,6 +1,8 @@
 const mongooose = require("mongoose");
 const validator = require("validator");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 const userSchema = mongooose.Schema({
     name:{
@@ -15,7 +17,6 @@ const userSchema = mongooose.Schema({
             if(!validator.isEmail(value))
             throw new Error("Invalid Email");
         },
-        // validate(value)
     },
     password:{
         type:String,
@@ -27,6 +28,16 @@ const userSchema = mongooose.Schema({
         default:null
     }
 },{versionKey:false});
+
+userSchema.methods.generateAuthToken = async function(){
+    try{
+        const token =await jwt.sign({_id:this._id},process.env.SECRET_KEY);
+        this.token = token;
+        return token;
+    }catch (err){
+        console.log(err);
+    }
+}
 
 userSchema.pre("save",async function(next){
     if(this.isModified("password")){
